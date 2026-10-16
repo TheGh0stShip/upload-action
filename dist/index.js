@@ -98,6 +98,25 @@ var PLATFORMS = [
 ];
 var BY_ID = new Map(PLATFORMS.map((p) => [p.id, p]));
 
+// src/inputs.ts
+var DEFAULTS = {
+  "fail-on-regression": "false",
+  comments: "decmp-comment",
+  "api-url": "https://api.decmp.dev"
+};
+function actionVariable(name) {
+  return `INPUT_${name.replace(/ /g, "_").toUpperCase()}`;
+}
+function scriptVariable(name) {
+  return `DECMP_${name.replace(/[ -]/g, "_").toUpperCase()}`;
+}
+function readInput(name, required = false, env = process.env) {
+  const fallback = name === "github-token" ? env.GITHUB_TOKEN : DEFAULTS[name];
+  const value = (env[actionVariable(name)]?.trim() || env[scriptVariable(name)]?.trim() || fallback?.trim()) ?? "";
+  if (required && !value) throw new Error(`input "${name}" is required (${scriptVariable(name)} in a run step)`);
+  return value;
+}
+
 // src/pr.ts
 import { appendFile, mkdir, readdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
@@ -606,7 +625,7 @@ async function runWorkflowRun(ctx, dir) {
     console.log(`::notice::no comparisons in ${dir}; nothing to post`);
     return;
   }
-  if (!ctx.token) throw new Error('input "github-token" is required to post the comments');
+  if (!ctx.token) throw new Error('input "github-token" (GITHUB_TOKEN in a run step) is required to post the comments');
   const gh = new GitHub(ctx.token, ctx.repository);
   const issue = await gh.pullRequestOf(run);
   if (!issue) {
@@ -633,11 +652,6 @@ var BANNER_TYPES = {
   ".jpeg": "image/jpeg",
   ".avif": "image/avif"
 };
-function input(name, required = false) {
-  const value = process.env[`INPUT_${name.replace(/ /g, "_").toUpperCase()}`]?.trim() ?? "";
-  if (required && !value) throw new Error(`input "${name}" is required`);
-  return value;
-}
 function git(...args) {
   try {
     return execFileSync("git", args, { encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] }).trim();
@@ -668,7 +682,7 @@ async function send(api, token, method, path, body, type = "application/json") {
   return JSON.parse(text);
 }
 async function readBanner() {
-  const path = input("banner");
+  const path = readInput("banner");
   if (!path) return null;
   const type = BANNER_TYPES[extname(path).toLowerCase()];
   if (!type) throw new Error(`banner must be one of ${Object.keys(BANNER_TYPES).join(", ")}`);
@@ -677,26 +691,26 @@ async function readBanner() {
   return { type, data: new Uint8Array(data) };
 }
 async function readReport() {
-  const report = JSON.parse(await readFile2(input("report", true), "utf8"));
+  const report = JSON.parse(await readFile2(readInput("report", true), "utf8"));
   return summarizeReport(report);
 }
 async function main() {
-  const api = input("api-url").replace(/\/$/, "") || "https://api.decmp.dev";
+  const api = readInput("api-url").replace(/\/$/, "") || "https://api.decmp.dev";
   const event = process.env.GITHUB_EVENT_NAME ?? "";
   const ctx = {
     api,
-    token: input("github-token"),
+    token: readInput("github-token"),
     repository: process.env.GITHUB_REPOSITORY ?? "",
-    failOnRegression: input("fail-on-regression") === "true",
+    failOnRegression: readInput("fail-on-regression") === "true",
     git
   };
-  if (event === "workflow_run") return runWorkflowRun(ctx, input("comments") || "decmp-comment");
-  if (event === "pull_request") return runPullRequest(ctx, input("version", true), await readReport());
+  if (event === "workflow_run") return runWorkflowRun(ctx, readInput("comments") || "decmp-comment");
+  if (event === "pull_request") return runPullRequest(ctx, readInput("version", true), await readReport());
   if (event.startsWith("pull_request")) {
     console.log(`::notice::decmp.dev ignores ${event} runs; use pull_request`);
     return;
   }
-  const version = input("version", true);
+  const version = readInput("version", true);
   const { measures, categories, units } = await readReport();
   const banner = await readBanner();
   const sha = process.env.GITHUB_SHA ?? git("rev-parse", "HEAD");
@@ -711,10 +725,10 @@ async function main() {
     measures,
     categories,
     project: {
-      name: input("name") || void 0,
-      short_name: input("short-name") || void 0,
-      platform: input("platform") || void 0,
-      default_version: input("default-version") || void 0
+      name: readInput("name") || void 0,
+      short_name: readInput("short-name") || void 0,
+      platform: readInput("platform") || void 0,
+      default_version: readInput("default-version") || void 0
     }
   };
   const token = await oidcToken();

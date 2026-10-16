@@ -37,6 +37,35 @@ jobs:
           banner: assets/banner.webp                     # optional, 1024x256
 ```
 
+### Or as a script, without the action
+
+The same uploader runs as a plain `run:` step, so your workflow doesn't depend on this repository. The step downloads
+a fixed release from the decmp.dev API, checks its SHA-256 and runs it with Node:
+
+```yaml
+      - name: Upload to decmp.dev
+        run: |
+          curl -fsSL https://api.decmp.dev/action/v1.1.0.mjs -o decmp.mjs
+          echo "10fb0039a067b4ffe67510959356a691efa6efbb0aae16450c04f8c64da0a5f8  decmp.mjs" | sha256sum -c
+          node decmp.mjs
+        env:
+          DECMP_REPORT: build/GZ2E01/report.json
+          DECMP_VERSION: GZ2E01
+          DECMP_NAME: "The Legend of Zelda: Twilight Princess"  # first upload only
+          DECMP_PLATFORM: gc                                   # first upload only
+          DECMP_BANNER: assets/banner.webp                     # optional, 1024x256
+          GITHUB_TOKEN: ${{ github.token }}                    # comments on pull requests
+```
+
+Every input below is a `DECMP_` variable, upper case with hyphens as underscores (`short-name` is
+`DECMP_SHORT_NAME`), with the same defaults; `github-token` falls back to `GITHUB_TOKEN`. Give the step an `id`
+and it has the same outputs. The job keeps the same permissions. GitHub's hosted runners have Node; on a self-hosted
+runner, install Node 24.
+
+Releases never change once published: `https://api.decmp.dev/action/manifest.json` lists every version with its
+SHA-256, and `/action/v1.mjs` always serves the latest 1.x (pin a version and its hash rather than using it in CI).
+v1.1.0 is the first release that runs as a script.
+
 Pushes to the default branch upload the report. Pull requests upload nothing: the action compares the pull request's
 report with its base commit's (or the latest report when the base wasn't measured) and keeps one comment per version up
 to date, with a Before / After / Δ table, the categories that changed and, against the latest report, the functions
@@ -66,7 +95,8 @@ Outputs: `comment-file` (on a pull request, the comparison to upload when the pu
 
 ## Pull requests from forks
 
-A fork's pull request runs with a read-only token, so it can't comment. Give the step an id and upload its comparison:
+A fork's pull request runs with a read-only token, so it can't comment. Give the step an id and upload its comparison
+(with the script, the run step takes the `id`; the rest is the same):
 
 ```yaml
       - uses: decmp/upload-action@v1
@@ -109,5 +139,7 @@ jobs:
 
       - uses: decmp/upload-action@v1   # posts what it finds in decmp-comment/
 ```
+
+With the script, the last step is the run step with `GITHUB_TOKEN: ${{ github.token }}` in its `env`.
 
 The posting run reads only figures from those files and renders the comment itself.
