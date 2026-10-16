@@ -1,0 +1,51 @@
+name: decmp.dev upload
+description: Upload an objdiff progress report to decmp.dev, and comment how pull requests change it
+branding:
+  icon: bar-chart-2
+  color: purple
+inputs:
+  report:
+    description: Path to the JSON report from `objdiff-cli report generate -f json` (required except on workflow_run)
+    required: false
+  version:
+    description: Game version the report measures, e.g. GZ2E01 or SLUS_014.36 (required except on workflow_run)
+    required: false
+  name:
+    description: Game title shown on decmp.dev (first upload, or to rename)
+    required: false
+  short-name:
+    description: Shorter title for badges
+    required: false
+  platform:
+    description: "Console id: gbc, n64, ps, gba, gc, ps2, xbox, nds, psp, xbox360, wii, 3ds, switch, win32"
+    required: false
+  default-version:
+    description: Version the project page opens on
+    required: false
+  banner:
+    description: Path to a header image in the repository (.webp, .png, .jpg or .avif, up to 1 MB; 1024x256 looks best)
+    required: false
+  github-token:
+    description: Token that posts the pull request comment; the job needs `permissions: pull-requests: write`
+    required: false
+    default: ${{ github.token }}
+  fail-on-regression:
+    description: On a pull request, fail the step when matched code, data, functions or complete units go down
+    required: false
+    default: 'false'
+  comments:
+    description: On workflow_run, the directory holding the comment files that forks' pull request runs uploaded
+    required: false
+    default: decmp-comment
+  api-url:
+    description: decmp.dev API
+    required: false
+    default: https://api.decmp.dev
+outputs:
+  comment-file:
+    description: On a pull request, the comparison to upload as an artifact when the pull request comes from a fork
+  regressed:
+    description: On a pull request, 'true' when it loses matched code, data, functions or complete units
+runs:
+  using: node24
+  main: dist/index.js
