@@ -26,7 +26,7 @@ inputs:
     description: Path to a header image in the repository (.webp, .png, .jpg or .avif, up to 1 MB; 1024x256 looks best)
     required: false
   github-token:
-    description: Token that posts the pull request comment; the job needs `permissions: pull-requests: write`
+    description: "Token that posts the pull request comment; the job needs `permissions: pull-requests: write`"
     required: false
     default: ${{ github.token }}
   fail-on-regression:
